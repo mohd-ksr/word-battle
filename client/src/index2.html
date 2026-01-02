@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Word Battle</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: radial-gradient(circle at top, #1e1e2f, #0f0f17);
+            color: #f1f1f1;
+            padding: 20px;
+        }
+
+        h2 {
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        input,
+        button {
+            padding: 8px 12px;
+            margin: 6px 4px;
+            border-radius: 6px;
+            border: none;
+            outline: none;
+            font-size: 14px;
+        }
+
+        input {
+            background: #1f2937;
+            color: #fff;
+            border: 1px solid #374151;
+        }
+
+        button {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #home,
+        #lobby,
+        #game {
+            background: #111827;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            max-width: 900px;
+        }
+
+        #players li {
+            margin: 6px 0;
+            padding: 6px 10px;
+            background: #1f2937;
+            border-radius: 6px;
+        }
+
+        #turnInfo {
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+
+        .your-turn {
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .waiting-turn {
+            color: #facc15;
+        }
+
+        #instruction {
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: #1f2937;
+            border-left: 4px solid #6366f1;
+            border-radius: 6px;
+        }
+
+        #actions {
+            margin-top: 10px;
+        }
+
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(15, 34px);
+            gap: 4px;
+            margin-top: 15px;
+            background: #020617;
+            padding: 12px;
+            border-radius: 12px;
+        }
+
+        .cell {
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 15px;
+            color: #e5e7eb;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .cell:hover {
+            background: #1e293b;
+            transform: scale(1.05);
+        }
+
+        .cell.disabled {
+            pointer-events: none;
+            opacity: 0.35;
+        }
+
+        .cell.filled {
+            background: #111827;
+            border-color: #4f46e5;
+            box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.6);
+        }
+
+        .cell.selected {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.8);
+        }
+
+        #log {
+            margin-top: 15px;
+            height: 150px;
+            overflow-y: auto;
+            background: #020617;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 12px;
+            color: #9ca3af;
+            border: 1px solid #1e293b;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <h2>Word Battle</h2>
+
+    <!-- HOME -->
+    <div id="home">
+        <input id="name" placeholder="Your name">
+        <br>
+        <button onclick="createRoom()">Create Room</button>
+        <br><br>
+        <input id="roomIdInput" placeholder="Room Code">
+        <button onclick="joinRoom()">Join Room</button>
+    </div>
+
+    <!-- LOBBY -->
+    <div id="lobby">
+        <h3>Lobby</h3>
+        <p>Room Code: <b id="roomCode"></b></p>
+        <ul id="players"></ul>
+        <button id="startBtn" onclick="startGame()">Start Game</button>
+        <p id="waitingMsg"></p>
+    </div>
+
+    <!-- GAME -->
+    <div id="game">
+        <h3 id="turnInfo">Turn: -</h3>
+        <div id="instruction"></div>
+
+        <div id="actions">
+            <button onclick="attemptWord()">Check Word</button>
+            <button onclick="passTurn()">Pass Turn</button>
+        </div>
+
+        <div id="grid"></div>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        const socket = io("http://localhost:3000");
+
+        const SIZE = 15;
+        let roomId = null;
+        let myId = null;
+        let ownerId = null;
+        let playerMap = {};
+
+        let grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+        let selected = [];
+
+        // 🔑 TURN STATE
+        let isMyTurn = false;
+        let letterPlaced = false;
+
+        const instructionEl = document.getElementById("instruction");
+        const actionsEl = document.getElementById("actions");
+
+        const log = msg => {
+            const l = document.getElementById("log");
+            l.innerHTML += msg + "<br>";
+            l.scrollTop = l.scrollHeight;
+        };
+
+        function getPlayerName() {
+            const name = document.getElementById("name").value.trim();
+            if (!name) {
+                alert("Please enter your name first");
+                return null;
+            }
+            return name;
+        }
+
+        // Build grid
+        const gridEl = document.getElementById("grid");
+        for (let r = 0; r < SIZE; r++) {
+            for (let c = 0; c < SIZE; c++) {
+                const d = document.createElement("div");
+                d.className = "cell disabled";
+                d.dataset.row = r;
+                d.dataset.col = c;
+                d.onclick = () => onCellClick(d);
+                gridEl.appendChild(d);
+            }
+        }
+
+        function enableGrid(enable) {
+            document.querySelectorAll(".cell").forEach(c => {
+                c.classList.toggle("disabled", !enable);
+            });
+        }
+
+        function onCellClick(cell) {
+            if (!isMyTurn) return;
+
+            const r = +cell.dataset.row;
+            const c = +cell.dataset.col;
+
+            // LETTER PLACEMENT (typed)
+            if (!letterPlaced && grid[r][c] === null) {
+                const input = document.createElement("input");
+                input.className = "letter-input";
+                input.maxLength = 1;
+
+                cell.innerHTML = "";
+                cell.appendChild(input);
+                input.focus();
+
+                input.addEventListener("input", () => {
+                    const val = input.value.toUpperCase();
+                    if (!/^[A-Z]$/.test(val)) {
+                        input.value = "";
+                        return;
+                    }
+
+                    socket.emit("PLACE_LETTER", {
+                        roomId,
+                        row: r,
+                        col: c,
+                        letter: val
+                    });
+
+                    letterPlaced = true;
+                });
+
+                input.addEventListener("blur", () => {
+                    if (!letterPlaced) cell.innerHTML = "";
+                });
+
+                return;
+            }
+
+            // WORD SELECTION (unchanged)
+            if (letterPlaced && grid[r][c] !== null) {
+                cell.classList.toggle("selected");
+                const i = selected.findIndex(x => x.row === r && x.col === c);
+                i === -1 ? selected.push({ row: r, col: c }) : selected.splice(i, 1);
+            }
+        }
+
+
+        function createRoom() {
+            const name = getPlayerName();
+            if (!name) return;
+            socket.emit("CREATE_ROOM", { playerName: name });
+        }
+
+        function joinRoom() {
+            const name = getPlayerName();
+            if (!name) return;
+
+            const code = document.getElementById("roomIdInput").value.trim();
+            if (!code) {
+                alert("Please enter room code");
+                return;
+            }
+
+            roomId = code;
+            socket.emit("JOIN_ROOM", { roomId, playerName: name });
+        }
+
+        function startGame() {
+            socket.emit("START_GAME", { roomId });
+        }
+
+        function passTurn() {
+            socket.emit("PASS_TURN", { roomId });
+            resetTurnUI();
+        }
+
+        function attemptWord() {
+            socket.emit("ATTEMPT_WORD", { roomId, cells: selected });
+            resetTurnUI();
+        }
+
+        function resetTurnUI() {
+            selected = [];
+            letterPlaced = false;
+            actionsEl.style.display = "none";
+            enableGrid(false);
+            instructionEl.innerText = "";
+            document.querySelectorAll(".selected").forEach(c => c.classList.remove("selected"));
+        }
+
+        /* ===== SOCKET EVENTS ===== */
+
+        socket.on("connect", () => {
+            myId = socket.id;
+        });
+
+        socket.on("ROOM_CREATED", d => {
+            roomId = d.roomId;
+            ownerId = d.ownerId;
+            playerMap = {};
+            d.players.forEach(p => playerMap[p.id] = p.name);
+            showLobby(d.players);
+        });
+
+        socket.on("PLAYER_JOINED", d => {
+            playerMap = {};
+            d.players.forEach(p => playerMap[p.id] = p.name);
+            showLobby(d.players);
+        });
+
+        socket.on("GAME_STARTED", () => {
+            document.getElementById("lobby").style.display = "none";
+            document.getElementById("game").style.display = "block";
+            log("🎮 Game Started");
+        });
+
+        socket.on("TURN_UPDATE", d => {
+            resetTurnUI();
+            isMyTurn = d.currentPlayerId === myId;
+
+            const name = playerMap[d.currentPlayerId] || "Unknown";
+            const turnEl = document.getElementById("turnInfo");
+            turnEl.innerText = "Turn: " + name;
+            turnEl.className = isMyTurn ? "your-turn" : "waiting-turn";
+
+
+            if (isMyTurn) {
+                instructionEl.innerText = "Select an empty cell to place a letter";
+                enableGrid(true);
+            } else {
+                instructionEl.innerText = "Waiting for other player...";
+                enableGrid(false);
+            }
+        });
+
+        socket.on("LETTER_PLACED", d => {
+            grid[d.row][d.col] = d.letter;
+            const idx = d.row * SIZE + d.col;
+            const cell = gridEl.children[idx];
+            cell.textContent = d.letter;
+            cell.classList.add("filled");
+
+            if (d.playerId === myId) {
+                letterPlaced = true;
+                instructionEl.innerText =
+                    "If you want to make a word, select letters and click Check Word, or Pass Turn";
+                actionsEl.style.display = "block";
+            }
+        });
+
+        socket.onAny((e, d) => {
+            if (!["LETTER_PLACED", "TURN_UPDATE"].includes(e))
+                log(e + ": " + JSON.stringify(d));
+        });
+
+        function showLobby(players) {
+            document.getElementById("home").style.display = "none";
+            document.getElementById("lobby").style.display = "block";
+            document.getElementById("roomCode").innerText = roomId;
+
+            const ul = document.getElementById("players");
+            ul.innerHTML = "";
+            players.forEach(p => {
+                const li = document.createElement("li");
+                li.textContent = p.name + (p.id === ownerId ? " (Host)" : "");
+                ul.appendChild(li);
+            });
+
+            const startBtn = document.getElementById("startBtn");
+            const waitMsg = document.getElementById("waitingMsg");
+
+            if (myId === ownerId) {
+                startBtn.style.display = "inline-block";
+                waitMsg.innerText = "";
+            } else {
+                startBtn.style.display = "none";
+                waitMsg.innerText = "Waiting for host to start the game...";
+            }
+        }
+    </script>
+
+</body>
+
+</html> 
