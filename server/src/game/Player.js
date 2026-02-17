@@ -1,10 +1,11 @@
+import crypto from "crypto";
 export default class Player {
   constructor(id, name) {
     this.id = id;
     this.name = name;
 
     this.score = 0;
-
+    this.token = crypto.randomUUID();
     this.lives = 2;
     this.isActive = true;
     this.isConnected = true;

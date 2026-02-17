@@ -25,7 +25,8 @@ export default function setupSockets(io) {
         ownerId: room.ownerId,
         players: room.players.map(p => ({
           id: p.id,
-          name: p.name
+          name: p.name,
+          token: p.token
         }))
       });
     });
@@ -37,14 +38,20 @@ export default function setupSockets(io) {
         socket.emit("MOVE_REJECTED", { reason: "ROOM_NOT_FOUND" });
         return;
       }
-
+      // console.log(room.gameStarted);
+      // 🚫 BLOCK JOIN IF GAME ALREADY STARTED
+      if (room.gameStarted) {
+        socket.emit("MOVE_REJECTED", { reason: "GAME_ALREADY_STARTED" });
+        return;
+      }
       room.addPlayer(socket.id, playerName);
       socket.join(roomId);
 
       io.to(roomId).emit("PLAYER_JOINED", {
         players: room.players.map(p => ({
           id: p.id,
-          name: p.name
+          name: p.name,
+          token: p.token
         }))
       });
     });
@@ -92,11 +99,12 @@ export default function setupSockets(io) {
 
       try {
         const result = room.attemptWord(socket.id, cells);
-
+        // console.log(socket.id.score);
         io.to(roomId).emit("WORD_RESULT", {
           playerId: socket.id,
           word: result.word,
-          points: result.points
+          points: result.points,
+          cells: cells
         });
       } catch (e) {
         socket.emit("MOVE_REJECTED", { reason: e.message });
@@ -126,7 +134,7 @@ export default function setupSockets(io) {
       try {
         room.revivePlayer(socket.id, io);
       } catch (e) {
-        socket.emit("MOVE_REJECTED", { reason: e.message });
+        socket.emit("MOVE_REJECTED", { reason: "I_AM_BACK_USED" });
       }
     });
 
@@ -137,40 +145,59 @@ export default function setupSockets(io) {
     /* ===== CHAT MESSAGE ===== */
     socket.on("CHAT_MESSAGE", ({ roomId, name, message }) => {
       if (!rooms.has(roomId)) return;
-
       io.to(roomId).emit("CHAT_MESSAGE", {
         name,
         message
       });
+    });
 
-      /* ===== REJOIN ROOM ===== */
-      socket.on("REJOIN_ROOM", ({ roomId, playerName }) => {
-        const room = rooms.get(roomId);
-        if (!room) return;
+    /* ================= REJOIN ROOM (🔥 FIXED) ================= */
+    socket.on("REJOIN_ROOM", ({ roomId, playerToken }) => {
+      const room = rooms.get(roomId);
 
-        const player = room.players.find(p => p.name === playerName);
-        if (!player) return;
+      if (!room) {
+        socket.emit("SESSION_RESTORE", { state: "HOME" });
+        return;
+      }
 
-        // 🔁 rebind socket
-        player.id = socket.id;
-        socket.join(roomId);
+      const player = room.players.find(p => p.token === playerToken);
+      if (!player) {
+        socket.emit("SESSION_RESTORE", { state: "HOME" });
+        return;
+      }
 
-        socket.emit("REJOIN_SUCCESS", {
+      // rebind socket
+      player.id = socket.id;
+      socket.join(roomId);
+
+      if (!room.gameStarted) {
+        socket.emit("SESSION_RESTORE", {
+          state: "LOBBY",
           roomId,
+          ownerId: room.ownerId,
           players: room.players.map(p => ({
             id: p.id,
-            name: p.name,
-            score: p.score,
-            lives: p.lives,
-            isActive: p.isActive
-          })),
-          grid: room.grid.cells,
-          currentPlayerId: room.getCurrentPlayer().id,
-          timeLimit: 40
+            name: p.name
+          }))
         });
+        return;
+      }
+
+      socket.emit("SESSION_RESTORE", {
+        state: "GAME",
+        roomId,
+        players: room.players.map(p => ({
+          id: p.id,
+          name: p.name,
+          score: p.score,
+          lives: p.lives,
+          isActive: p.isActive
+        })),
+        grid: room.grid.cells,
+        currentPlayerId: room.getCurrentPlayer().id,
+        timeLimit: 40
       });
-
-
     });
+
   });
 }
