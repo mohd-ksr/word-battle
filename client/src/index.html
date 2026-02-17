@@ -4,32 +4,92 @@
 <head>
   <title>Word Battle</title>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
 
-  <h1 class="title">Word Battle</h1>
+  <!-- TITLE -->
+  <h1 class="title">Word Battle ⚔️</h1>
 
-  <!-- HOME -->
-  <div id="home" class="card">
-    <p class="subtitle">Enter your name to play</p>
-    <input id="nameInput" placeholder="Your name" />
-    <button id="playBtn" disabled>Play</button>
+  <!-- MAIN ACTION AREA (HOME ↔ MODE SWAP HERE) -->
+  <div id="mainAction">
+
+    <!-- HOME -->
+    <div id="home" class="card">
+      <p class="subtitle">Enter your name to play</p>
+      <input id="nameInput" placeholder="Your name" />
+      <button id="playBtn" disabled>Play</button>
+    </div>
+
+    <!-- MODE -->
+    <div id="mode" class="card hidden">
+      <p>Welcome, <b id="playerNameLabel"></b> 👋</p>
+      <button id="createBtn">Create Room</button>
+      <button id="joinBtn">Join Room</button>
+
+      <div id="joinBox" class="hidden">
+        <input id="roomCodeInput" placeholder="Room Code" />
+        <button id="joinConfirmBtn">Join</button>
+      </div>
+    </div>
+
+    <!-- LOBBY -->
+    <div id="lobby" class="card hidden">
+      <h3>Lobby</h3>
+      <p>Room Code: <b id="roomCode"></b></p>
+      <ul id="players"></ul>
+      <p id="lobbyMsg"></p>
+      <button id="startGameBtn" class="hidden">Start Game</button>
+    </div>
+
   </div>
 
+  <!-- RULES (ALWAYS BELOW MAIN ACTION) -->
+  <div id="rulesCard" class="card how-to-play">
+    <h3>🎮 How to Play Word Battle</h3>
 
+    <div class="rules-grid">
+      <ul class="rules left">
+        <li>
+          <b>1. Join or Create Room</b><br />
+          Enter your name and create a room or join using a room code.
+        </li>
+        <li>
+          <b>2. Turn-Based Gameplay</b><br />
+          Each player gets a turn. Only the active player can play.
+        </li>
+        <li>
+          <b>3. Timer Rule ⏱️</b><br />
+          You have 40 seconds to complete your turn.
+          Time up → lose 1 life.
+        </li>
+        <li>
+          <b>4. Lives System ❤️</b><br />
+          Start with 2 lives. Lose both → eliminated.<br />
+          With 1 life left, you can use <b>"I'm Back"</b> once.
+        </li>
+      </ul>
 
-  <!-- MODE -->
-  <div id="mode" class="card hidden">
-    <p>Welcome, <b id="playerNameLabel"></b> 👋</p>
-    <button id="createBtn">Create Room</button>
-    <button id="joinBtn">Join Room</button>
-
-    <div id="joinBox" class="hidden">
-      <input id="roomCodeInput" placeholder="Room Code" />
-      <button id="joinConfirmBtn">Join</button>
+      <ul class="rules right">
+        <li>
+          <b>5. Making a Word ✍️</b><br />
+          Place exactly one letter first, then select connected letters.<br />
+          Letters must be in a straight line (horizontal / vertical).
+        </li>
+        <li>
+          <b>6. Scoring 🏆</b><br />
+          Score = number of letters in the word.<br />
+          Example: DOG → +3 points
+        </li>
+        <li>
+          <b>7. Used Words Rule</b><br />
+          Once a word is used, it cannot be used again.
+        </li>
+      </ul>
     </div>
   </div>
 
@@ -42,103 +102,53 @@
     <button id="startGameBtn" class="hidden">Start Game</button>
   </div>
 
-
-
-
-<!-- HOW TO PLAY / RULES -->
-<div id="rulesCard" class="card how-to-play">
-  <h3>🎮 How to Play Word Battle</h3>
-
-  <ul class="rules">
-    <li><b>1. Join or Create Room</b><br>
-      Enter your name and create a room or join using a room code.
-    </li>
-
-    <li><b>2. Turn-Based Gameplay</b><br>
-      Each player gets a turn. Only the active player can play.
-    </li>
-
-    <li><b>3. Timer Rule ⏱️</b><br>
-      You have 40 seconds to complete your turn. Time up → lose 1 life.
-    </li>
-
-    <li><b>4. Lives System ❤️</b><br>
-      Start with 2 lives. Lose both → eliminated.<br>
-      With 1 life left, you can use <b>"I'm Back"</b> once.
-    </li>
-
-    <li><b>5. Making a Word ✍️</b><br>
-      Place exactly one letter first, then select connected letters.<br>
-      Letters must be in a straight line (horizontal / vertical).
-    </li>
-
-    <li><b>6. Scoring 🏆</b><br>
-      Score = number of letters in the word.<br>
-      Example: DOG → +3 points
-    </li>
-
-    <li><b>7. Used Words Rule</b><br>
-      Once a word is used, it cannot be used again.
-    </li>
-  </ul>
-</div>
-
-
-
-
-
   <!-- GAME -->
   <div id="game" class="card hidden">
 
-    <!-- SCOREBOARD -->
     <div id="scoreboard"></div>
 
-    <!-- CHAT -->
+    <div id="usedWords" class="used-words">
+      <b>Used Words</b>
+      <input type="text" id="usedWordSearch" placeholder="Search used word..." class="used-word-search" />
+      <div id="usedWordsList"></div>
+    </div>
+
     <div id="chatBox">
       <div id="chatMessages"></div>
-
       <div id="chatInputArea">
         <input id="chatInput" placeholder="Type message..." />
         <button id="sendChatBtn">Send</button>
       </div>
     </div>
 
+    <div id="playerHeader">
 
-    <!-- USED WORDS -->
-    <div id="usedWords" class="used-words">
-      <b>Used Words</b>
-      <div id="usedWordsList"></div>
+      <span id="currentPlayerDisplay" class="current-player"></span>
+
+      <div id="playerStatus">
+        <span id="life1">❤️</span>
+        <span id="life2">❤️</span>
+        <button id="imBackBtn" class="hidden">I'm Back</button>
+      </div>
+
     </div>
 
-    <!-- 🔥 CENTER PLAYER NAME -->
-    <div id="currentPlayerDisplay" class="current-player"></div>
-
-    <!-- ❤️ LIVES + IM BACK -->
-    <div id="livesBar">
-      <span id="life1">❤️</span>
-      <span id="life2">❤️</span>
-
-      <button id="imBackBtn" class="hidden">I'm Back</button>
-    </div>
-
-    <!-- ⏱️ TIMER -->
     <div id="timer" class="timer">⏱️ 40s</div>
 
     <div id="instruction"></div>
-
+    <div id="grid"></div>
     <div id="actions" class="hidden">
       <button id="checkWordBtn">Check Word</button>
       <button id="passTurnBtn">Pass Turn</button>
     </div>
 
-    <div id="grid"></div>
+
   </div>
 
   <!-- POPUP -->
   <div id="popup" class="popup hidden"></div>
 
-  <script src="./app.js"></script>
-
+  <!-- END GAME -->
   <div id="endGameOverlay" class="endgame hidden">
     <div class="endgame-card">
       <h2>🏆 Game Over</h2>
@@ -146,6 +156,8 @@
       <button id="playAgainBtn">Play Again</button>
     </div>
   </div>
+
+  <script src="./app.js"></script>
 
 </body>
 

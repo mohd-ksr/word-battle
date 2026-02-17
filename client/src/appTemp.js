@@ -8,24 +8,10 @@ const usedWordsListEl = document.getElementById("usedWordsList");
 let usedWords = [];
 
 
-function renderUsedWords(filterText = "") {
+function renderUsedWords() {
   usedWordsListEl.innerHTML = "";
 
-  const query = filterText.toLowerCase();
-
-  const filteredWords = usedWords.filter(w =>
-    w.word.toLowerCase().includes(query)
-  );
-
-  if (filteredWords.length === 0) {
-    const div = document.createElement("div");
-    div.className = "used-word-row empty";
-    div.innerText = "No matching used word";
-    usedWordsListEl.appendChild(div);
-    return;
-  }
-
-  filteredWords.forEach(w => {
+  usedWords.forEach(w => {
     const div = document.createElement("div");
     div.className = "used-word-row";
     div.innerText = `${w.player} → ${w.word} (+${w.points})`;
@@ -146,12 +132,6 @@ let selected = [];
 let isMyTurn = false;
 let letterPlaced = false;
 
-// ===== DRAG SELECTION STATE =====
-let isDragging = false;
-let dragStart = null;      // { row, col }
-let dragDirection = null; // "H" | "V"
-let hasDragged = false;
-
 // ===== ELEMENTS =====
 const home = document.getElementById("home");
 const mode = document.getElementById("mode");
@@ -185,14 +165,6 @@ const gridEl = document.getElementById("grid");
 const scoreboardEl = document.getElementById("scoreboard");
 
 const rulesCard = document.getElementById("rulesCard");
-const usedWordSearchInput = document.getElementById("usedWordSearch");
-
-
-usedWordSearchInput.addEventListener("input", e => {
-  renderUsedWords(e.target.value);
-});
-
-renderUsedWords("");
 
 // ===== HOME =====
 nameInput.addEventListener("input", () => {
@@ -219,16 +191,10 @@ joinConfirmBtn.onclick = () => {
   const code = roomCodeInput.value.trim();
   if (!code) return alert("Enter room code");
   roomId = code;
-  socket.emit("JOIN_ROOM", { roomId, playerName: myName, playerToken });
+  socket.emit("JOIN_ROOM", { roomId, playerName: myName });
 };
 localStorage.setItem("roomId", roomId);
 localStorage.setItem("playerName", myName);
-
-if (!localStorage.getItem("playerToken")) {
-  localStorage.setItem("playerToken", crypto.randomUUID());
-}
-
-const playerToken = localStorage.getItem("playerToken");
 
 
 // ===== GRID BUILD =====
@@ -239,8 +205,6 @@ for (let r = 0; r < SIZE; r++) {
     cell.dataset.row = r;
     cell.dataset.col = c;
     cell.onclick = () => onCellClick(cell);
-    cell.onmousedown = () => onCellMouseDown(cell);
-    cell.onmouseenter = () => onCellMouseEnter(cell);
     gridEl.appendChild(cell);
   }
 }
@@ -253,7 +217,6 @@ function enableGrid(enable) {
 
 // ===== CELL CLICK =====
 function onCellClick(cell) {
-  if (hasDragged) return;
   if (!isMyTurn) return;
 
   const r = +cell.dataset.row;
@@ -295,129 +258,10 @@ function onCellClick(cell) {
   }
 }
 
-
-function onCellMouseDown(cell) {
-  if (!isMyTurn || !letterPlaced) return;
-  if (!cell.classList.contains("filled")) return;
-
-  isDragging = true;
-  hasDragged = false;
-  dragDirection = null;
-
-  dragStart = {
-    row: +cell.dataset.row,
-    col: +cell.dataset.col
-  };
-}
-
-function onCellMouseEnter(cell) {
-  if (!isDragging || !dragStart) return;
-
-  if (!hasDragged) {
-    hasDragged = true;
-    clearSelection();
-    selectCell(dragStart.row, dragStart.col);
-  }
-
-  const r = +cell.dataset.row;
-  const c = +cell.dataset.col;
-
-  if (!dragDirection) {
-    if (r === dragStart.row) dragDirection = "H";
-    else if (c === dragStart.col) dragDirection = "V";
-    else return;
-  }
-
-  // clearSelection();
-
-  if (dragDirection === "H") {
-    const start = Math.min(dragStart.col, c);
-    const end = Math.max(dragStart.col, c);
-    for (let i = start; i <= end; i++) {
-      selectCell(dragStart.row, i);
-    }
-  }
-
-  if (dragDirection === "V") {
-    const start = Math.min(dragStart.row, r);
-    const end = Math.max(dragStart.row, r);
-    for (let i = start; i <= end; i++) {
-      selectCell(i, dragStart.col);
-    }
-  }
-}
-
-document.addEventListener("mouseup", () => {
-  isDragging = false;
-  dragStart = null;
-  dragDirection = null;
-
-  // 👇 IMPORTANT
-  setTimeout(() => {
-    hasDragged = false;
-  }, 0);
-});
-
-function selectCell(r, c) {
-  if (!grid[r][c]) return;
-
-  const idx = r * SIZE + c;
-  const cell = gridEl.children[idx];
-
-  if (!cell.classList.contains("selected")) {
-    cell.classList.add("selected");
-    selected.push({ row: r, col: c });
-  }
-}
-
-function clearSelection() {
-  selected = [];
-  document
-    .querySelectorAll(".cell.selected")
-    .forEach(c => c.classList.remove("selected"));
-}
-
-
-function highlightWordCells(cells) {
-  cells.forEach(({ row, col }) => {
-    const idx = row * SIZE + col;
-    const cell = gridEl.children[idx];
-
-    if (!cell) return;
-
-    // 🔥 force re-trigger animation
-    cell.classList.remove("correct-word");
-    void cell.offsetWidth;
-    cell.classList.add("correct-word");
-
-    setTimeout(() => {
-      cell.classList.remove("correct-word");
-    }, 1000);
-  });
-}
-
-function animateWrongWord(cells) {
-  cells.forEach(({ row, col }) => {
-    const idx = row * SIZE + col;
-    const cell = gridEl.children[idx];
-    if (!cell) return;
-
-    cell.classList.remove("word-error");
-    void cell.offsetWidth; // force reflow
-    cell.classList.add("word-error");
-
-    setTimeout(() => {
-      cell.classList.remove("word-error");
-      // cell.style.opacity = "";
-      cell.style.transform = "";
-    }, 900);
-  });
-}
-
 // ===== GAME ACTIONS =====
 checkWordBtn.onclick = () => {
   socket.emit("ATTEMPT_WORD", { roomId, cells: selected });
-  // resetTurnUI();
+  resetTurnUI();
 };
 
 passTurnBtn.onclick = () => {
@@ -439,65 +283,21 @@ function resetTurnUI() {
     .forEach(c => c.classList.remove("selected"));
 }
 
+// ===== SCOREBOARD =====
 function renderScoreboard(activePlayerId) {
-  const rows = Array.from(scoreboardEl.children)
-    .filter(el => el.classList.contains("player-row"));
-
-  // 🔹 SAVE OLD POSITIONS
-  const prevPositions = {};
-  rows.forEach(row => {
-    prevPositions[row.dataset.playerId] = row.getBoundingClientRect();
-  });
-
-  // 🔹 SORT PLAYERS
-  const sortedPlayers = Object.keys(playerMap)
-    .map(id => ({
-      id,
-      name: playerMap[id],
-      score: scores[id] || 0
-    }))
-    .sort((a, b) => b.score - a.score);
-
-  // 🔹 REBUILD DOM
   scoreboardEl.innerHTML = "<b>Players</b><br><br>";
 
-  sortedPlayers.forEach(p => {
+  Object.entries(playerMap).forEach(([id, name]) => {
     const row = document.createElement("div");
     row.className = "player-row";
-    row.dataset.playerId = p.id;
-
-    if (p.id === activePlayerId) row.classList.add("active");
+    row.dataset.playerId = id;
+    if (id === activePlayerId) row.classList.add("active");
 
     row.innerHTML = `
-      <span>${p.name}</span>
-      <span>${p.score}</span>
+      <span>${name}</span>
+      <span>${scores[id] || 0}</span>
     `;
-
     scoreboardEl.appendChild(row);
-  });
-
-  // 🔹 APPLY FLIP ANIMATION
-  const newRows = Array.from(scoreboardEl.children)
-    .filter(el => el.classList.contains("player-row"));
-
-  newRows.forEach(row => {
-    const id = row.dataset.playerId;
-    if (!prevPositions[id]) return;
-
-    const oldPos = prevPositions[id];
-    const newPos = row.getBoundingClientRect();
-
-    const dy = oldPos.top - newPos.top;
-
-    if (dy) {
-      row.style.transform = `translateY(${dy}px)`;
-      row.style.transition = "none";
-
-      requestAnimationFrame(() => {
-        row.style.transition = "transform 0.35s ease";
-        row.style.transform = "";
-      });
-    }
   });
 }
 
@@ -527,9 +327,6 @@ socket.on("ROOM_CREATED", d => {
   d.players.forEach(p => {
     playerMap[p.id] = p.name;
     scores[p.id] = 0;
-    if (p.id === myId) {
-      localStorage.setItem("playerToken", p.token); // 🔥 THIS WAS THE GAP
-    }
   });
 
   mode.classList.add("hidden");
@@ -568,9 +365,10 @@ socket.on("GAME_STARTED", () => {
   // 🔥 HIDE RULES AFTER GAME START
   if (rulesCard) rulesCard.classList.add("hidden");
 
+  // center me sirf apna naam
   currentPlayerDisplay.innerText = myName;
-  timerEl.innerText = "⏱️ --";
-
+  localStorage.setItem("roomId", d.roomId);
+  localStorage.setItem("playerName", myName);
 });
 
 // TURN UPDATE
@@ -593,14 +391,17 @@ socket.on("TURN_UPDATE", d => {
   }
 });
 
+socket.on("GAME_STARTED", () => {
+  lobby.classList.add("hidden");
+  game.classList.remove("hidden");
+
+  currentPlayerDisplay.innerText = myName;
+  timerEl.innerText = "⏱️ --";
+});
 
 // WORD RESULT (SCORE UPDATE)
 socket.on("WORD_RESULT", d => {
-  // console.log("WORD_RESULT payload:", d);
-  // 🔥 highlight correct word
-  if (d.cells && Array.isArray(d.cells)) {
-    highlightWordCells(d.cells);
-  }
+
   // ✅ SCORE UPDATE (already)
   scores[d.playerId] = (scores[d.playerId] || 0) + d.points;
   renderScoreboard(d.playerId);
@@ -612,8 +413,8 @@ socket.on("WORD_RESULT", d => {
     points: d.points
   });
 
-  // renderUsedWords();
-  renderUsedWords(usedWordSearchInput.value);
+  renderUsedWords();
+
   // 🔔 POPUPS (already)
   if (d.playerId === myId) {
     showPopup(`🎉 +${d.points} points! ${d.word}`, "success");
@@ -622,31 +423,27 @@ socket.on("WORD_RESULT", d => {
     showPopup(`🧠 ${name} made "${d.word}" (+${d.points})`, "info");
   }
 });
-// ===== LETTER PLACED =====
+
+
+// LETTER PLACED
 socket.on("LETTER_PLACED", d => {
   grid[d.row][d.col] = d.letter;
   const idx = d.row * SIZE + d.col;
   const cell = gridEl.children[idx];
-
   cell.textContent = d.letter;
   cell.classList.add("filled");
-
-  // 🔥 FORCE RE-TRIGGER ANIMATION
-  cell.classList.remove("recent-letter");
-  void cell.offsetWidth; // reflow (IMPORTANT)
+  
   cell.classList.add("recent-letter");
-
   setTimeout(() => {
     cell.classList.remove("recent-letter");
   }, 1000);
-
+  
   if (d.playerId === myId) {
     letterPlaced = true;
     instructionEl.innerText =
       "Select letters → Check Word OR Pass Turn";
     actionsEl.classList.remove("hidden");
   }
-  renderScoreboard(d.playerId);
 });
 
 // ===== LOBBY =====
@@ -677,24 +474,8 @@ socket.on("MOVE_REJECTED", d => {
     WORD_USED: "⚠️ Word already used",
     EMPTY_CELL: "❌ Invalid selection",
     MUST_PLACE_LETTER_FIRST: "⚠️ Place a letter first",
-    WORD_VARIATION_USED: "⚠️ Word variation already used",
-    NEED_AT_LEAST_2_PLAYERS: "Need atleast 2 playesrs",
-    ROOM_NOT_FOUND: "❌ Invalid room code",
-    IM_BACK_NOT_ALLOWED: "❌ You can revive once only",
-    IM_BACK_OK: "Your life revived",
-    GAME_ALREADY_STARTED: "❌ Game Started",
+    WORD_VARIATION_USED: "⚠️ Word variation already used"
   };
-
-  const penaltyErrors = [
-    "INVALID_ENGLISH_WORD",
-    "WORD_USED",
-    "WORD_VARIATION_USED",
-    "NOT_STRAIGHT_LINE",
-    "NOT_CONTINUOUS",
-  ];
-  if (isMyTurn && penaltyErrors.includes(d.reason)) {
-    animateWrongWord([...selected]); // copy for safety
-  }
 
   showPopup(map[d.reason] || "❌ Invalid move", "error");
 });
@@ -826,3 +607,63 @@ document.getElementById("playAgainBtn").onclick = () => {
 
   showPopup("🔄 Ready for next game", "info");
 };
+
+
+
+window.addEventListener("load", () => {
+  const savedRoom = localStorage.getItem("roomId");
+  const savedName = localStorage.getItem("playerName");
+
+  if (savedRoom && savedName) {
+    socket.emit("REJOIN_ROOM", {
+      roomId: savedRoom,
+      playerName: savedName
+    });
+  }
+});
+
+
+socket.on("REJOIN_SUCCESS", d => {
+  roomId = d.roomId;
+
+  playerMap = {};
+  scores = {};
+
+  d.players.forEach(p => {
+    playerMap[p.id] = p.name;
+    scores[p.id] = p.score;
+
+    if (p.id === myId) {
+      updateLivesUI(p.lives);
+    }
+  });
+
+  // restore grid
+  grid = d.grid;
+  gridEl.innerHTML = "";
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      if (grid[r][c]) {
+        cell.textContent = grid[r][c];
+        cell.classList.add("filled");
+      }
+
+      cell.onclick = () => onCellClick(cell);
+      gridEl.appendChild(cell);
+    }
+  }
+
+  lobby.classList.add("hidden");
+  game.classList.remove("hidden");
+
+  renderScoreboard(d.currentPlayerId);
+  startTurnTimer(d.timeLimit || 40);
+
+  showPopup("🔄 Reconnected to game", "success");
+});
