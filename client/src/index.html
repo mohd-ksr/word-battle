@@ -5,7 +5,7 @@
   <title>Word Battle</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+  <link rel="icon" type="image/png" href="./logo.png" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -13,11 +13,12 @@
 <body>
 
   <!-- TITLE -->
-  <h1 class="title">Word Battle ⚔️</h1>
-
+  <!-- <h1 class="title">Word Battle ⚔️</h1> -->
+    <div class="logo-wrapper">
+      <img src="./logo.png" alt="Word Battle Logo" class="game-logo" />
+    </div>
   <!-- MAIN ACTION AREA (HOME ↔ MODE SWAP HERE) -->
   <div id="mainAction">
-
     <!-- HOME -->
     <div id="home" class="card">
       <p class="subtitle">Enter your name to play</p>

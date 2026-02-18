@@ -148,6 +148,43 @@ button:disabled {
 #mainAction .card {
   margin-bottom: 0;
 }
+
+.logo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 0px;
+}
+
+.game-logo {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+  /* margin-bottom: 80px; */
+}
+
+/* .game-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #e5e7eb;
+  letter-spacing: 0.5px;
+} */
+
+.subtitle {
+  opacity: 0.85;
+}
+
+.game-logo {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
 /* ================= GAME ================= */
 
 #game {
