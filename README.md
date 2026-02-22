@@ -39,9 +39,9 @@ The architecture ensures synchronized gameplay across all connected clients usin
 2. Create a room or join using a room code.
 3. Wait for the host to start the game.
 4. On your turn:
-   - Place exactly one letter.
-   - Select connected letters in a straight line.
-   - Submit your word before the timer runs out.
+- Place exactly one letter.
+- Select connected letters in a straight line.
+- Submit your word before the timer runs out.
 5. Score points based on word length.
 6. Survive with your lives and outscore opponents.
 
@@ -66,5 +66,5 @@ The architecture ensures synchronized gameplay across all connected clients usin
   - Once a word is used, it cannot be used again.
 
 ## 👨‍💻 Author
-Mo Kausar 
-GitHub: https://github.com/mohd-ksr/
+- Mo Kausar 
+- GitHub: https://github.com/mohd-ksr/
