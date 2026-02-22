@@ -6,7 +6,8 @@ The architecture ensures synchronized gameplay across all connected clients usin
 
 ## 🌐 Live Game
 
-🔗 [Play Here](https://wordxbattle.netlify.app/)
+## 🌐 Live Game
+🔗 <a href="https://wordxbattle.netlify.app/" target="_blank">Play Here</a>
 
 ## 🚀 Features
 - 🎮 Real-time multiplayer gameplay
