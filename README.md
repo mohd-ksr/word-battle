@@ -34,7 +34,7 @@ The architecture ensures synchronized gameplay across all connected clients usin
 - Real-time state synchronization
 - Modular game logic separation
 
-### 🎮 How to Play
+## 🎮 How to Play
 1. Enter your name.
 2. Create a room or join using a room code.
 3. Wait for the host to start the game.
@@ -45,7 +45,7 @@ The architecture ensures synchronized gameplay across all connected clients usin
 5. Score points based on word length.
 6. Survive with your lives and outscore opponents.
 
-### 📜 Game Rules
+## 📜 Game Rules
 1. Join or Create Room
   - Enter your name and create a room or join using a room code.
 2. Turn-Based Gameplay
