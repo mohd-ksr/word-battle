@@ -4,8 +4,9 @@ Players take turns placing letters and forming valid English words on a shared g
 
 The architecture ensures synchronized gameplay across all connected clients using Socket.IO and a modular backend game engine.
 
-## Live Game
-🔗 Play Here: https://wordxbattle.netlify.app/
+## 🌐 Live Game
+
+🔗 [Play Here](https://wordxbattle.netlify.app/)
 
 ## 🚀 Features
 - 🎮 Real-time multiplayer gameplay
